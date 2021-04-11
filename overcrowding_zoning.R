@@ -256,7 +256,8 @@ for (i in 1:5) {
   scale_fill_viridis_c(limits=c(0,1)) + 
   theme_bw() +
   labs(title=titles[i], fill=' ') + 
-  coord_sf(xlim=c(gateway_bbox['xmin']-7000,gateway_bbox['xmax']), ylim=c(gateway_bbox['ymin']-1000,gateway_bbox['ymax']+9000)) + theme(panel.background = element_rect(fill='aliceblue')))
+  coord_sf(xlim=c(gateway_bbox['xmin']-7000,gateway_bbox['xmax']), ylim=c(gateway_bbox['ymin']-1000,gateway_bbox['ymax']+9000)) + 
+    theme(panel.background = element_rect(fill='aliceblue')))
   
 }
 
@@ -266,7 +267,8 @@ ggplot(data=la_gdf) + geom_sf(aes_string(fill='rentburden'), size=.1) +
   scale_fill_viridis_c(limits=c(0,1)) + 
   theme_bw() +
   labs(fill=' ',title='Rent Burden in Gateway') + 
-  coord_sf(xlim=c(gateway_bbox['xmin']-7000,gateway_bbox['xmax']), ylim=c(gateway_bbox['ymin']-1000,gateway_bbox['ymax']+9000)) + theme(panel.background = element_rect(fill='aliceblue'))
+  coord_sf(xlim=c(gateway_bbox['xmin']-7000,gateway_bbox['xmax']), ylim=c(gateway_bbox['ymin']-1000,gateway_bbox['ymax']+9000)) +
+  theme(panel.background = element_rect(fill='aliceblue'))
 
 #sigle_fam_zoning map
 ggplot(data=la_gdf) + geom_sf(aes_string(fill='percent_sf'), size=.1) +
@@ -274,7 +276,8 @@ ggplot(data=la_gdf) + geom_sf(aes_string(fill='percent_sf'), size=.1) +
   scale_fill_viridis_c(limits=c(0,1)) + 
   theme_bw() +
   labs(fill=' ',title='Single Family Zoning in Gateway') + 
-  coord_sf(xlim=c(gateway_bbox['xmin']-7000,gateway_bbox['xmax']), ylim=c(gateway_bbox['ymin']-1000,gateway_bbox['ymax']+9000)) + theme(panel.background = element_rect(fill='aliceblue'))
+  coord_sf(xlim=c(gateway_bbox['xmin']-7000,gateway_bbox['xmax']), ylim=c(gateway_bbox['ymin']-1000,gateway_bbox['ymax']+9000)) +
+  theme(panel.background = element_rect(fill='aliceblue'))
 
 
 
