@@ -67,7 +67,7 @@ res_tot<-zn_tract %>%
         mutate(all_parcels=replace_na(Residential,0) + replace_na(NonResidential,0)) %>%
         select(-NonResidential) %>%
         left_join(sf_mf) %>%
-        replace_na(list(Residential = 0, all_parcels = 0, SingleFamily = 0, 'Multi-Family' = 0 ))
+        replace_na(list(Residential = 0, all_parcels = 0, SingleFamily = 0, Multi-Family = 0 ))
  
 
 ##### Load Census data #####
