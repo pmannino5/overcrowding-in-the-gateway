@@ -6,11 +6,11 @@ library(dplyr)
 library(sf)
 library(ggplot2)
 library(ggpubr)
-library(readr)
+library(ggthemes)
 library(tidyr)
-library(stringr)
-library(clubSandwich)
 library(censusapi)
+library(fixest)
+library(readr)
 
 #set working directory
 setwd('/Users/petermannino/Documents/School/Classes/Practicum/overcrowding_zoning')
@@ -62,17 +62,17 @@ res_tot<-zn_tract %>%
         group_by(GEOID,Type) %>% 
         summarize(num_parcels=sum(num_parcels)) %>% 
         drop_na(Type) %>%
-        mutate(Type=replace(Type, str_detect(Type,' '),'NonResidential')) %>%
+        mutate(Type=replace(Type, stringr::str_detect(Type,' '),'NonResidential')) %>%
         spread(Type, num_parcels) %>%
         mutate(all_parcels=replace_na(Residential,0) + replace_na(NonResidential,0)) %>%
         select(-NonResidential) %>%
         left_join(sf_mf) %>%
-        replace_na(list(Residential = 0, all_parcels = 0, SingleFamily = 0, Multi-Family = 0 ))
- 
+        replace_na(list(Residential = 0, all_parcels = 0, SingleFamily = 0, 'Multi-Family' = 0 ))
+
 
 ##### Load Census data #####
 
-#Sys.setenv(CENSUS_KEY=[insert your key here])
+Sys.setenv(CENSUS_KEY="[insert api key]")
 
 #get api list
 apis <- listCensusApis()
@@ -124,44 +124,36 @@ census_df<-getCensus(name='acs/acs5',
                      region = "tract:*", 
                      regionin = "state:06+county:037")
 
-#calculate overcrowding metrics
-census_df$white_overcrowding<-census_df$B25014H_003E/census_df$B25014H_001E
-census_df$black_overcrowding<-census_df$B25014B_003E/census_df$B25014B_001E
-census_df$hispanic_overcrowding<-census_df$B25014I_003E/census_df$B25014I_001E
-census_df$owner_overcrowding<-(census_df$B25014_005E+census_df$B25014_006E+census_df$B25014_007E)/census_df$B25014_002E
-census_df$renter_overcrowding<-(census_df$B25014_011E+census_df$B25014_012E+census_df$B25014_013E)/census_df$B25014_008E
-
-#calculate other demographic measures
-census_df$rentburden<-(census_df$B25070_007E + 
-                        census_df$B25070_008E + 
-                        census_df$B25070_009E + 
-                        census_df$B25070_010E)/
-                        census_df$B25070_001E
-
-census_df$pct_white<-census_df$B03002_003E/census_df$B03002_001E
-census_df$pct_black<-census_df$B03002_004E/census_df$B03002_001E
-census_df$pct_asian<-census_df$B03002_006E/census_df$B03002_001E
-census_df$pct_hispanic<-census_df$B03002_012E/census_df$B03002_001E
-census_df$pct_poverty<-(census_df$C17002_002E+census_df$C17002_003E)/census_df$C17002_001E
+#calculate overcrowding, rent burden and demographic metrics
+census_df<- census_df %>%
+            mutate(white_overcrowding=B25014H_003E/B25014H_001E,
+                   black_overcrowding=B25014B_003E/B25014B_001E,
+                   hispanic_overcrowding=B25014I_003E/B25014I_001E,
+                   owner_overcrowding=(B25014_005E+B25014_006E+B25014_007E)/B25014_002E,
+                   renter_overcrowding=(B25014_011E+B25014_012E+B25014_013E)/B25014_008E,
+                   rent_burden=(B25070_007E+B25070_008E+B25070_009E+B25070_010E)/B25070_001E,
+                   pct_white=B03002_003E/B03002_001E,
+                   pct_black=B03002_004E/B03002_001E,
+                   pct_asian=B03002_006E/B03002_001E,
+                   pct_hispanic=B03002_012E/B03002_001E,
+                   pct_poverty=(C17002_002E+C17002_003E)/C17002_001E)
 
 #generate GEOID
-census_df$GEOID <- str_c(census_df$state,census_df$county, census_df$tract, sep="")
+census_df$GEOID <- stringr::str_c(census_df$state,census_df$county, census_df$tract, sep="")
 
 ##### Merge census and zoning data and plot #####
 
 #merge zoning and census data
 
 cols<-c('GEOID','white_overcrowding','black_overcrowding','hispanic_overcrowding',
-'owner_overcrowding','renter_overcrowding','rentburden','pct_white',
-'pct_black','pct_asian','pct_hispanic','pct_poverty','GEOID','B19019_001E','B25064_001E')
+'owner_overcrowding','renter_overcrowding','rent_burden','pct_white',
+'pct_black','pct_asian','pct_hispanic','pct_poverty','B19019_001E','B25064_001E')
 
 sf_census_df<-res_tot %>% 
                  left_join(census_df[cols]) %>%
-                 rename(med_hh_inc=B19019_001E, med_rent_price=B25064_001E)
-
-
-#calculate single family share of tract
-sf_census_df$percent_sf<-sf_census_df$SingleFamily/sf_census_df$all_parcels
+                 rename(med_hh_inc=B19019_001E, med_rent_price=B25064_001E) %>%
+                 mutate(med_hh_inc=med_hh_inc/1000,
+                        percent_sf=SingleFamily/all_parcels)
 
 
 #make scatterplots with best fit lines for overcrowding and zoning
@@ -175,7 +167,7 @@ titles<-c('White Overcrowding','Black Overcrowding','Hispanic Overcrowding','Own
 #list to hold plots
 plots<-list()
 
-#loop to create plots
+#loop to create plots of sfz and overcrowding
 for (i in 1:5) {
 
   p1<-ggplot(sf_census_df,aes_string(x='percent_sf', y=colnames[i])) + 
@@ -186,18 +178,35 @@ for (i in 1:5) {
   plots[[i]]<-p1
 }
 
-#show plots
-ggarrange(plotlist=plots,ncol=3,nrow=2)
+#Arrange plots in one figure
+grph_grid<-ggarrange(plotlist=plots,ncol=3,nrow=2)
+
+grph_grid #show grid
 
 #save plots on one page
-jpeg(filename = 'overcrowding_plots.jpg',width=1000,height = 800)
-ggarrange(plotlist=plots,ncol=3,nrow=2)
-dev.off()
+ggsave("overcrowding_plots.jpg",plot=grph_grid,width=8.5, height=7)
+
 
 # plot other demographic correlates of overcrowding
-ggplot(sf_census_df, aes_string(x='rentburden',y='renter_overcrowding')) + geom_point() + geom_smooth(method=lm)
+ggplot(sf_census_df, aes_string(x='rent_burden',y='renter_overcrowding')) +
+  geom_point() + 
+  geom_smooth(method=lm)
 
-# plot bar graph
+# plot sf policy correlate
+ggplot(sf_census_df, aes_string(x='percent_sf',y='pct_white')) +
+  geom_point() + 
+  geom_smooth(method=lm) +
+  coord_cartesian(xlim =c(-.01, 1.03), ylim = c(0, 1), expand=FALSE) +
+  labs(x='Percent Single Family Zoned',y='Percent White',title='Zoning and Race') +
+  theme_pubr()
+
+# Median Household Income and Rent Burden
+ggplot(sf_census_df %>% filter(med_hh_inc>0), aes_string(x='med_hh_inc',y='rent_burden')) +
+  geom_point() + 
+  geom_smooth(method=lm) +
+  labs(x='Median Household Income (in Thousands)',y='Rent Burden',title='Income and Housing') +
+  scale_x_continuous(breaks=seq(0,200,20)) +
+  theme_stata()
 
 ##### Link tract to gateway city #####
 
@@ -220,12 +229,14 @@ sf_census_city_df<-sf_census_city_df %>%
 
 ##### Regression Model on determinants of overcrowding #####
 
-#model - main explanatory variable is city level sfz
-model<-lm(renter_overcrowding ~  sf_share + med_hh_inc + med_rent_price + pct_black + pct_hispanic + pct_asian + rentburden, data=sf_census_city_df)
-#cluster standard errors
-coef_test(model,vcov = 'CR2', cluster=sf_census_city_df$CITY, test = "naive-t")
-#regular standard errors
+#model - main explanatory variable is city level sfz, includes city fixed effects
+model<-feols(renter_overcrowding ~  percent_sf + med_hh_inc + med_rent_price + pct_black + pct_hispanic + pct_asian + rent_burden | CITY, data=sf_census_city_df) 
+
+#summary
 summary(model)
+
+#results show that a positive coefficient on single family zoning, so that SFZ is associated with increased renter overcrowding
+#however, the p-value is .09
 
 ##### Maps #####
 
@@ -233,7 +244,7 @@ summary(model)
 islands<-c('06037599100','06037599000')
 
 columns<-c('GEOID','white_overcrowding','black_overcrowding','hispanic_overcrowding',
-        'owner_overcrowding','renter_overcrowding','rentburden','pct_white',
+        'owner_overcrowding','renter_overcrowding','rent_burden','pct_white',
         'pct_black','pct_asian','pct_hispanic','pct_poverty','med_hh_inc','med_rent_price', 'percent_sf')
 
 
@@ -244,10 +255,15 @@ la_gdf<-la_tracts %>%
 #Get gateway cities outline
 gateway<-st_read('data/scag_parcel_data.gdb', layer=layers$name[3]) %>%
   st_transform(utm)
-gateway<-gateway[3:10,]
-gateway_bbox<-gateway %>% st_bbox()
+gateway<-gateway[3:10,] # remove islands
 
-#overcrowding maps with gateway outline
+
+#get map limits
+gateway_bbox<-gateway %>% st_bbox()
+xlim<-c(gateway_bbox['xmin']-7000,gateway_bbox['xmax'])
+ylim<-c(gateway_bbox['ymin']-1000,gateway_bbox['ymax']+9000)
+
+#overcrowding maps with gateway outline, zoom into gateway city region
 
 for (i in 1:5) {
 
@@ -256,18 +272,17 @@ for (i in 1:5) {
   scale_fill_viridis_c(limits=c(0,1)) + 
   theme_bw() +
   labs(title=titles[i], fill=' ') + 
-  coord_sf(xlim=c(gateway_bbox['xmin']-7000,gateway_bbox['xmax']), ylim=c(gateway_bbox['ymin']-1000,gateway_bbox['ymax']+9000)) + 
+  coord_sf(xlim=xlim, ylim=ylim) + 
     theme(panel.background = element_rect(fill='aliceblue')))
-  
 }
 
 #rent burden map
-ggplot(data=la_gdf) + geom_sf(aes_string(fill='rentburden'), size=.1) +
+ggplot(data=la_gdf) + geom_sf(aes_string(fill='rent_burden'), size=.1) +
   geom_sf(data=gateway, fill=NA,size=1,color='black') +
   scale_fill_viridis_c(limits=c(0,1)) + 
   theme_bw() +
   labs(fill=' ',title='Rent Burden in Gateway') + 
-  coord_sf(xlim=c(gateway_bbox['xmin']-7000,gateway_bbox['xmax']), ylim=c(gateway_bbox['ymin']-1000,gateway_bbox['ymax']+9000)) +
+  coord_sf(xlim=xlim, ylim=ylim) +
   theme(panel.background = element_rect(fill='aliceblue'))
 
 #sigle_fam_zoning map
@@ -276,7 +291,7 @@ ggplot(data=la_gdf) + geom_sf(aes_string(fill='percent_sf'), size=.1) +
   scale_fill_viridis_c(limits=c(0,1)) + 
   theme_bw() +
   labs(fill=' ',title='Single Family Zoning in Gateway') + 
-  coord_sf(xlim=c(gateway_bbox['xmin']-7000,gateway_bbox['xmax']), ylim=c(gateway_bbox['ymin']-1000,gateway_bbox['ymax']+9000)) +
+  coord_sf(xlim=xlim, ylim=ylim) +
   theme(panel.background = element_rect(fill='aliceblue'))
 
 
