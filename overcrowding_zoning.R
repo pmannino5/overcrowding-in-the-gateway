@@ -229,7 +229,7 @@ sf_census_city_df<-sf_census_city_df %>%
 
 ##### Regression Model on determinants of overcrowding #####
 
-#model - main explanatory variable is city level sfz, includes city fixed effects
+#model - main explanatory variable is tract percent sfz, includes city fixed effects
 model<-feols(renter_overcrowding ~  percent_sf + med_hh_inc + med_rent_price + pct_black + pct_hispanic + pct_asian + rent_burden | CITY, data=sf_census_city_df) 
 
 #summary
